@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Love Catcher Arcade 🕹️</title>
+    <style>
+        :root {
+            --pink: #ff4d79;
+            --dark-pink: #d92655;
+            --bg: #ffeef2;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg);
+            font-family: 'Courier New', Courier, monospace; /* Retro arcade font vibe */
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%; max-width: 450px;
+            height: 90vh; max-height: 700px;
+            background: #ffffff;
+            border: 6px solid #ffb3c6;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(255, 77, 121, 0.25);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        /* Arcade HUD/Header */
+        #hud {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px; background: #fff0f3;
+            border-bottom: 3px dashed #ffb3c6;
+            font-weight: bold; font-size: 1.1rem; color: var(--dark-pink);
+            z-index: 10;
+        }
+
+        #canvasZone {
+            position: relative; flex-grow: 1;
+            background: radial-gradient(circle, #ffffff 60%, #fff5f7 100%);
+            cursor: none; /* Hides mouse to use custom basket */
+        }
+
+        /* Player Basket */
+        #basket {
+            position: absolute; bottom: 20px; left: 50%;
+            width: 75px; height: 45px;
+            background: var(--pink);
+            border: 3px solid var(--dark-pink);
+            border-radius: 0 0 15px 15px;
+            transform: translateX(-50%);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.5rem; font-weight: bold; color: white;
+            box-shadow: 0 5px 0 var(--dark-pink);
+            transition: background 0.1s;
+        }
+
+        /* Falling Items */
+        .falling-item {
+            position: absolute; font-size: 2rem;
+            transform: translate(-50%, -50%);
+            will-change: transform;
+        }
+
+        /* Popups & Screens */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 238, 242, 0.95);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            padding: 30px; text-align: center; z-index: 20;
+        }
+
+        h1 { color: var(--dark-pink); font-size: 1.8rem; margin-bottom: 10px; }
+        p { color: #5c4146; font-size: 1rem; line-height: 1.5; }
+
+        .btn {
+            background: var(--pink); color: white; border: none;
+            padding: 12px 30px; font-size: 1.1rem; font-weight: bold;
+            font-family: inherit; border-radius: 25px; cursor: pointer;
+            box-shadow: 0 5px 0 var(--dark-pink); margin-top: 20px;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--dark-pink); }
+
+        /* Secret Letter Overlay */
+        #letterOverlay {
+            background: rgba(74, 54, 57, 0.7); backdrop-filter: blur(4px);
+        }
+        .letter-card {
+            background: #fffdf9; border: 3px solid #ffb74d;
+            padding: 25px; border-radius: 15px; max-width: 85%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: envelopeOpen 0.4s ease-out forwards;
+        }
+        @keyframes envelopeOpen {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .letter-card h2 { color: #e65100; margin: 0 0 15px 0; font-size: 1.3rem; }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <!-- HUD -->
+        <div id="hud">
+            <div>SCORE: <span id="scoreTxt">0</span>/100</div>
+            <div>LIVES: <span id="livesTxt">❤️❤️❤️</span></div>
+        </div>
+
+        <!-- Game World -->
+        <div id="canvasZone">
+            <div id="basket">🧺</div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="startScreen" class="screen">
+            <h1>LOVE CATCHER V1.0 🕹️</h1>
+            <p>Catch the <b>Hearts (❤️)</b> and my secret <b>Love Letters (✉️)</b>.<br><br>
+            ⚠️ Avoid the <b>Alarms (⏰)</b> and <b>Chores (🧹)</b> or you'll lose a life!</p>
+            <button class="btn" onclick="startGame()">START GAME</button>
+        </div>
+
+        <!-- Letter Popup Screen -->
+        <div id="letterOverlay" class="screen" style="display: none;">
+            <div class="letter-card">
+                <h2>✉️ UNLOCKED A MEMORY ✉️</h2>
+                <p id="letterContent">Loading sweet thoughts...</p>
+                <button class="btn" style="background:#ff9800; box-shadow: 0 5px 0 #e65100;" onclick="resumeGame()">Resume Catching ❤️</button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen" style="display: none;">
+            <h1 id="endTitle">GAME OVER 💔</h1>
+            <p id="endDesc">Too many distractions! Want to try again for my heart?</p>
+            <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 📝 WRITE YOUR SECRET LETTERS HERE (Unlocked by catching ✉️) ---
+        const loveLetters = [
+            "Random reminder: You are my absolute safe space. No matter how crazy the world gets, coming back to you makes everything fine. 🥰",
+            "I love how hard you work, but remember to take care of yourself too! I'm always cheering for you from the sidelines. 📣❤️",
+            "My favorite place in the absolute universe is smashed right next to you on the couch doing absolutely nothing. 🛋️",
+            "Thank you for being my best friend, my partner in crime, and the person who handles my weirdness perfectly. I love you! ✨"
+        ];
+
+        const container = document.getElementById('canvasZone');
+        const basket = document.getElementById('basket');
+        const scoreTxt = document.getElementById('scoreTxt');
+        const livesTxt = document.getElementById('livesTxt');
+        
+        let score = 0;
+        let lives = 3;
+        let gameActive = false;
+        let spawnTimer;
+        let itemsArray = [];
+        let letterIndex = 0;
+        let speedMultiplier = 1;
+
+        // Track mouse or touch positioning
+        container.addEventListener('mousemove', (e) => {
+            if (!gameActive) return;
+            moveBasket(e.clientX);
+        });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!gameActive) return;
+            moveBasket(e.touches[0].clientX);
+        });
+
+        function moveBasket(clientX) {
+            const rect = container.getBoundingClientRect();
+            let relativeX = clientX - rect.left;
+            // Bound inside container
+            if (relativeX < 37) relativeX = 37;
+            if (relativeX > rect.width - 37) relativeX = rect.width - 37;
+            basket.style.left = relativeX + 'px';
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            gameActive = true;
+            score = 0; lives = 3; letterIndex = 0; speedMultiplier = 1;
+            scoreTxt.textContent = score;
+            livesTxt.textContent = "❤️❤️❤️";
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            // Randomly spawn items
+            if (Math.random() < 0.04) {
+                spawnItem();
+            }
+
+            updateItems();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function spawnItem() {
+            const item = document.createElement('div');
+            item.className = 'falling-item';
+            
+            // Item Types: Good, Bad, rare Secret Letter
+            const rand = Math.random();
+            let type = 'good';
+            if (rand < 0.65) {
+                item.innerHTML = '❤️';
+                type = 'good';
+            } else if (rand < 0.90) {
+                item.innerHTML = ['⏰', '🧹', '❌'][Math.floor(Math.random() * 3)];
+                type = 'bad';
+            } else {
+                item.innerHTML = '✉️';
+                type = 'letter';
+            }
+
+            const rect = container.getBoundingClientRect();
+            item.style.left = (Math.random() * (rect.width - 40) + 20) + 'px';
+            item.style.top = '-20px';
+            
+            container.appendChild(item);
+            
+            itemsArray.push({
+                element: item,
+                y: -20,
+                speed: (Math.random() * 3 + 3) * speedMultiplier,
+                type: type
+            });
+        }
+
+        function updateItems() {
+            const rect = container.getBoundingClientRect();
+            const basketRect = basket.getBoundingClientRect();
+
+            for (let i = itemsArray.length - 1; i >= 0; i--) {
+                let item = itemsArray[i];
+                item.y += item.speed;
+                item.element.style.top = item.y + 'px';
+
+                let itemRect = item.element.getBoundingClientRect();
+
+                // Collision detection with basket
+                if (
+                    itemRect.bottom >= basketRect.top &&
+                    itemRect.top <= basketRect.bottom &&
+                    itemRect.right >= basketRect.left &&
+                    itemRect.left <= basketRect.right
+                ) {
+                    handleCollision(item, i);
+                    continue;
+                }
+
+                // Remove item if it hits the floor
+                if (item.y > rect.height + 20) {
+                    item.element.remove();
+                    itemsArray.splice(i, 1);
+                }
+            }
+        }
+
+        function handleCollision(item, index) {
+            item.element.remove();
+            itemsArray.splice(index, 1);
+
+            if (item.type === 'good') {
+                score += 5;
+                scoreTxt.textContent = score;
+                // Game speeds up slightly as he scores
+                speedMultiplier += 0.03; 
+                
+                if (score >= 100) {
+                    endGame(true);
+                }
+            } else if (item.type === 'bad') {
+                lives--;
+                updateLivesDisplay();
+                if (lives <= 0) {
+                    endGame(false);
+                }
+            } else if (item.type === 'letter') {
+                triggerLetterPopup();
+            }
+        }
+
+        function updateLivesDisplay() {
+            let hearts = "";
+            for(let i=0; i<lives; i++) hearts += "❤️";
+            if (hearts === "") hearts = "💔";
+            livesTxt.textContent = hearts;
+        }
+
+        function triggerLetterPopup() {
+            gameActive = false;
+            const currentLetter = loveLetters[letterIndex % loveLetters.length];
+            document.getElementById('letterContent').textContent = currentLetter;
+            document.getElementById('letterOverlay').style.display = 'flex';
+            letterIndex++;
+        }
+
+        function resumeGame() {
+            document.getElementById('letterOverlay').style.display = 'none';
+            // Clear current dangerous items on screen so he doesn't get hit instantly
+            clearAllItems();
+            gameActive = true;
+            gameLoop();
+        }
+
+        function clearAllItems() {
+            itemsArray.forEach(item => item.element.remove());
+            itemsArray = [];
+        }
+
+        function endGame(isWin) {
+            gameActive = false;
+            clearAllItems();
+            const endScreen = document.getElementById('gameOverScreen');
+            const title = document.getElementById('endTitle');
+            const desc = document.getElementById('endDesc');
+
+            if (isWin) {
+                title.innerHTML = "🏆 YOU WIN MY HEART! 🏆";
+                desc.innerHTML = "Incredible reflex skills, handsome! You easily dodged life's busy distractions and reached 100% Love score. Your reward is waiting in real life. (I love you infinitely! Custom gift complete!)";
+            } else {
+                title.innerHTML = "GAME OVER 💔";
+                desc.innerHTML = "Oh no! Chores and alarms got the best of you! Your girlfriend's love is still waiting for you to catch it though. Try again?";
+            }
+            endScreen.style.display = 'flex';
+        }
+
+        function resetGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            startGame();
+        }
+    </script>
+</body>
+</html>
